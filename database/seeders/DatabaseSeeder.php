@@ -11,29 +11,59 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RoleSeeder::class);
 
-        $admin = User::create([
-            'name' => 'Admin EduAbsen',
-            'email' => 'admin@eduabsen.test',
-            'password' => 'password',   // otomatis di-hash oleh cast 'hashed'
-            'department' => 'IT',
-        ]);
-        $admin->assignRole('admin');
+        // Akun demo disamakan dengan daftar akun di halaman login frontend.
+        $demoUsers = [
+            [
+                'name' => 'Deva Fauzan Nuraqli',
+                'email' => 'admin@eduabsen.com',
+                'department' => 'IT',
+                'role' => 'admin',
+            ],
+            [
+                'name' => 'Budi Santoso',
+                'email' => 'finance@eduabsen.com',
+                'department' => 'Finance',
+                'role' => 'finance',
+            ],
+            [
+                'name' => 'Dewi Lestari',
+                'email' => 'hrd@eduabsen.com',
+                'department' => 'HRD',
+                'role' => 'hrd',
+            ],
+            [
+                'name' => 'Andi Saputra',
+                'email' => 'pegawai@eduabsen.com',
+                'department' => 'Marketing',
+                'role' => 'pegawai',
+            ],
+            [
+                'name' => 'Atasan Demo',
+                'email' => 'atasan@eduabsen.com',
+                'department' => 'Manajemen',
+                'role' => 'atasan',
+            ],
+        ];
 
-        $atasan = User::create([
-            'name' => 'Budi Atasan',
-            'email' => 'atasan@eduabsen.test',
-            'password' => 'password',
-            'department' => 'Operasional',
-        ]);
-        $atasan->assignRole('atasan');
+        foreach ($demoUsers as $data) {
+            $user = User::updateOrCreate(
+                ['email' => $data['email']],
+                [
+                    'name' => $data['name'],
+                    'password' => 'password123',   // otomatis di-hash oleh cast 'hashed'
+                    'department' => $data['department'],
+                ],
+            );
 
-        $pegawai = User::create([
-            'name' => 'Sinta Pegawai',
-            'email' => 'pegawai@eduabsen.test',
-            'password' => 'password',
-            'department' => 'Operasional',
-            'atasan_id' => $atasan->id,
-        ]);
-        $pegawai->assignRole('pegawai');
+            $user->syncRoles([$data['role']]);
+        }
+
+        // Hubungkan pegawai demo ke atasan demo.
+        $atasan = User::where('email', 'atasan@eduabsen.com')->first();
+        $pegawai = User::where('email', 'pegawai@eduabsen.com')->first();
+
+        if ($atasan && $pegawai) {
+            $pegawai->update(['atasan_id' => $atasan->id]);
+        }
     }
 }

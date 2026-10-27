@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
 {
-    private const ROLES = ['pegawai', 'atasan', 'admin'];
+    private const ROLES = ['pegawai', 'atasan', 'admin', 'finance', 'hrd'];
 
     // GET /users?q=nama&role=atasan
     public function index(Request $request)

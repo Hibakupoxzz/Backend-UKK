@@ -12,7 +12,7 @@ class RoleSeeder extends Seeder
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        foreach (['pegawai', 'atasan', 'admin'] as $role) {
+        foreach (['pegawai', 'atasan', 'admin', 'finance', 'hrd'] as $role) {
             Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
         }
     }

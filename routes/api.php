@@ -58,8 +58,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('trips/{trip}/complete', [ApprovalController::class, 'complete']); // selesai -> lengkap
     });
 
+    // ---------- Data pegawai (admin & HRD) ----------
+    Route::middleware('role:admin|hrd')->group(function () {
+        Route::get('users', [UserController::class, 'index']);
+        Route::get('users/{user}', [UserController::class, 'show']);
+    });
+
     // ---------- Administrator ----------
     Route::middleware('role:admin')->group(function () {
-        Route::apiResource('users', UserController::class);
+        Route::apiResource('users', UserController::class)->except(['index', 'show']);
     });
 });

@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Enums\TripStatus;
 use App\Models\Trip;
 use App\Models\User;
+use App\Notifications\TripDecided;
+use App\Notifications\TripSubmitted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -12,7 +14,12 @@ class TripWorkflowService
 {
     public function submit(Trip $trip): Trip
     {
-        return $this->move($trip, TripStatus::Diajukan);
+        $trip = $this->move($trip, TripStatus::Diajukan);
+
+        // Email ke atasan langsung. Dilewati kalau pegawai belum punya atasan.
+        $trip->user->atasan?->notify(new TripSubmitted($trip));
+
+        return $trip;
     }
 
     public function start(Trip $trip): Trip
@@ -52,7 +59,7 @@ class TripWorkflowService
 
     private function decide(Trip $trip, User $approver, TripStatus $status, ?string $catatan): Trip
     {
-        return DB::transaction(function () use ($trip, $approver, $status, $catatan) {
+        DB::transaction(function () use ($trip, $approver, $status, $catatan) {
             $this->move($trip, $status);
 
             $trip->approvals()->create([
@@ -61,9 +68,12 @@ class TripWorkflowService
                 'status'      => $status->value,
                 'catatan'     => $catatan,
             ]);
-
-            return $trip;
         });
+
+        // Email dikirim setelah data tersimpan
+        $trip->user->notify(new TripDecided($trip, $status, $catatan));
+
+        return $trip;
     }
 
     private function move(Trip $trip, TripStatus $next): Trip
