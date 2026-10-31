@@ -14,18 +14,23 @@ class UserController extends Controller
 {
     private const ROLES = ['pegawai', 'atasan', 'admin', 'finance', 'hrd'];
 
-    // GET /users?q=nama&role=atasan
+    // GET /users?q=nama&role=atasan&per_page=15
     public function index(Request $request)
     {
-        $request->validate(['role' => ['nullable', Rule::in(self::ROLES)]]);
+        $request->validate([
+            'role' => ['nullable', Rule::in(self::ROLES)],
+            'is_active' => ['nullable', 'boolean'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
 
         $users = User::with(['roles', 'atasan'])
             ->when($request->query('q'), fn ($q, $v) => $q->where(
                 fn ($w) => $w->where('name', 'like', "%{$v}%")->orWhere('email', 'like', "%{$v}%")
             ))
             ->when($request->query('role'), fn ($q, $v) => $q->role($v))
+            ->when($request->has('is_active'), fn ($q) => $q->where('is_active', $request->boolean('is_active')))
             ->orderBy('name')
-            ->paginate(15);
+            ->paginate($request->integer('per_page', 15));
 
         return UserResource::collection($users);
     }
@@ -39,6 +44,9 @@ class UserController extends Controller
             'password'   => ['required', 'string', 'min:8'],
             'role'       => ['required', Rule::in(self::ROLES)],
             'department' => ['nullable', 'string', 'max:100'],
+            'no_hp'      => ['nullable', 'string', 'max:30'],
+            'jabatan'    => ['nullable', 'string', 'max:100'],
+            'is_active'  => ['sometimes', 'boolean'],
             'atasan_id'  => ['nullable', 'integer', 'exists:users,id'],
         ]);
 
@@ -67,6 +75,9 @@ class UserController extends Controller
             'password'   => ['nullable', 'string', 'min:8'],
             'role'       => ['sometimes', 'required', Rule::in(self::ROLES)],
             'department' => ['nullable', 'string', 'max:100'],
+            'no_hp'      => ['nullable', 'string', 'max:30'],
+            'jabatan'    => ['nullable', 'string', 'max:100'],
+            'is_active'  => ['sometimes', 'boolean'],
             'atasan_id'  => ['nullable', 'integer', 'exists:users,id'],
         ]);
 
@@ -80,12 +91,23 @@ class UserController extends Controller
             ]);
         }
 
+        if ($user->is($request->user()) && array_key_exists('is_active', $data) && ! $data['is_active']) {
+            throw ValidationException::withMessages([
+                'is_active' => ['Tidak bisa menonaktifkan akun sendiri.'],
+            ]);
+        }
+
         $attrs = collect($data)->except('role');
         if (empty($data['password'])) {
             $attrs->forget('password'); // kosong = password tidak diganti
         }
 
         $user->update($attrs->all());
+
+        // Menonaktifkan akun juga mencabut seluruh token agar sesi lama tidak bisa dipakai.
+        if (array_key_exists('is_active', $data) && ! $data['is_active']) {
+            $user->tokens()->delete();
+        }
 
         if (isset($data['role'])) {
             $user->syncRoles($data['role']);

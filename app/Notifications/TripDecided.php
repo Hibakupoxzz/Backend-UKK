@@ -4,15 +4,11 @@ namespace App\Notifications;
 
 use App\Enums\TripStatus;
 use App\Models\Trip;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class TripDecided extends Notification implements ShouldQueue
+class TripDecided extends Notification
 {
-    use Queueable;
-
     public function __construct(
         public Trip $trip,
         public TripStatus $status,
@@ -21,7 +17,25 @@ class TripDecided extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return $notifiable->notificationChannels();
+    }
+
+    public function toDatabase(object $notifiable): array
+    {
+        $trip = $this->trip;
+        $disetujui = $this->status === TripStatus::Disetujui;
+
+        return [
+            'type'    => 'trip_decided',
+            'title'   => $disetujui ? 'Pengajuan perjalanan disetujui' : 'Pengajuan perjalanan ditolak',
+            'message' => $disetujui
+                ? "Perjalanan dinas Anda ke {$trip->tujuan} telah disetujui."
+                : "Perjalanan dinas Anda ke {$trip->tujuan} ditolak.",
+            'url'     => $this->urlFor($notifiable, $trip),
+            'trip_id' => $trip->id,
+            'status'  => $this->status->value,
+            'catatan' => $this->catatan,
+        ];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -46,5 +60,16 @@ class TripDecided extends Notification implements ShouldQueue
         return $mail->line($disetujui
             ? 'Anda dapat memulai perjalanan melalui aplikasi EduAbsen.'
             : 'Silakan perbaiki data perjalanan lalu ajukan kembali.');
+    }
+
+    private function urlFor(object $notifiable, Trip $trip): string
+    {
+        return match (true) {
+            $notifiable->hasRole('pegawai') => '/pegawai/laporan',
+            $notifiable->hasRole('atasan')  => "/atasan/perjalanan-tim/{$trip->id}",
+            $notifiable->hasRole('hrd')     => "/hrd/detail-perjalanan/{$trip->id}",
+            $notifiable->hasRole('finance') => '/finance/laporan',
+            default                         => "/admin/DetailPerjalanan?id={$trip->id}",
+        };
     }
 }

@@ -29,10 +29,21 @@ class ReportController extends Controller
 
         $totalBiaya = Expense::whereHas('trip', fn ($q) => $q->visibleTo($user))->sum('jumlah');
 
+        $tripsDenganEstimasi = Trip::visibleTo($user)
+            ->whereNotNull('estimasi_biaya')
+            ->withSum('expenses', 'jumlah')
+            ->get(['id', 'estimasi_biaya']);
+
+        $totalEstimasi = (float) $tripsDenganEstimasi->sum('estimasi_biaya');
+        $realisasiDenganEstimasi = (float) $tripsDenganEstimasi->sum(fn ($trip) => (float) ($trip->expenses_sum_jumlah ?? 0));
+
         $data = [
             'total_perjalanan' => $status->sum(),
             'per_status'       => $status,
             'total_biaya'      => (float) $totalBiaya,
+            'total_estimasi'   => $totalEstimasi,
+            'total_selisih'    => $realisasiDenganEstimasi - $totalEstimasi,
+            'perjalanan_dengan_estimasi' => $tripsDenganEstimasi->count(),
             'terbaru'          => TripResource::collection(
                 Trip::with('user')->withSum('expenses', 'jumlah')
                     ->visibleTo($user)->latest()->limit(5)->get()
@@ -66,7 +77,10 @@ class ReportController extends Controller
             ->orderBy('tanggal_berangkat')
             ->get();
 
-        $headings = ['No', 'Pegawai', 'Departemen', 'Tujuan', 'Berangkat', 'Pulang', 'Status', 'Total Biaya (Rp)'];
+        $headings = [
+            'No', 'Pegawai', 'Departemen', 'Tujuan', 'Berangkat', 'Pulang', 'Status',
+            'Realisasi Biaya (Rp)', 'Estimasi Biaya (Rp)', 'Selisih (Rp)',
+        ];
 
         $rows = $trips->values()->map(fn ($t, $i) => [
             $i + 1,
@@ -77,9 +91,20 @@ class ReportController extends Controller
             $t->tanggal_pulang->format('d-m-Y'),
             $t->status->label(),
             (float) ($t->expenses_sum_jumlah ?? 0),
+            $t->estimasi_biaya === null ? null : (float) $t->estimasi_biaya,
+            $t->estimasi_biaya === null
+                ? null
+                : (float) ($t->expenses_sum_jumlah ?? 0) - (float) $t->estimasi_biaya,
         ])->all();
 
-        $footer = 'Total biaya: Rp ' . number_format((float) $trips->sum('expenses_sum_jumlah'), 0, ',', '.');
+        $totalRealisasi = (float) $trips->sum('expenses_sum_jumlah');
+        $totalEstimasi = (float) $trips->whereNotNull('estimasi_biaya')->sum('estimasi_biaya');
+        $totalSelisih = (float) $trips->whereNotNull('estimasi_biaya')
+            ->sum(fn ($t) => (float) ($t->expenses_sum_jumlah ?? 0) - (float) $t->estimasi_biaya);
+
+        $footer = 'Total realisasi: Rp ' . number_format($totalRealisasi, 0, ',', '.')
+            . ' | Total estimasi: Rp ' . number_format($totalEstimasi, 0, ',', '.')
+            . ' | Selisih: Rp ' . number_format($totalSelisih, 0, ',', '.');
 
         return $this->output($request, 'Laporan Perjalanan Dinas', 'laporan-perjalanan', $headings, $rows, $footer);
     }

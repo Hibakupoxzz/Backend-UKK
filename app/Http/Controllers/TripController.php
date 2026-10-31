@@ -19,29 +19,23 @@ class TripController extends Controller
 
     public function index(Request $request)
     {
+        $request->validate(['per_page' => ['nullable', 'integer', 'min:1', 'max:100']]);
+
         $user = $request->user();
 
         $query = Trip::with('user')
             ->withSum('expenses', 'jumlah')
+            ->visibleTo($user)
             ->filter($request->only(['user_id', 'tujuan', 'status', 'dari', 'sampai']));
 
-        if ($user->hasRole('admin')) {
-            // admin melihat semua
-        } elseif ($user->hasRole('atasan')) {
-            $ids = $user->bawahan()->pluck('id')->push($user->id);
-            $query->whereIn('user_id', $ids);
-        } else {
-            $query->where('user_id', $user->id);
-        }
-
-        return TripResource::collection($query->latest()->paginate(15));
+        return TripResource::collection($query->latest()->paginate($request->integer('per_page', 15)));
     }
 
     public function store(StoreTripRequest $request): JsonResponse
     {
         $trip = DB::transaction(function () use ($request) {
             $trip = $request->user()->trips()->create([
-                ...$request->safe()->only(['tujuan', 'tanggal_berangkat', 'tanggal_pulang', 'keperluan']),
+                ...$request->safe()->only(['tujuan', 'tanggal_berangkat', 'tanggal_pulang', 'keperluan', 'estimasi_biaya']),
                 'status' => TripStatus::Draft,
             ]);
             $trip->needs()->createMany($request->validated('needs', []));
@@ -64,7 +58,7 @@ class TripController extends Controller
         $this->authorize('update', $trip);
 
         DB::transaction(function () use ($request, $trip) {
-            $trip->update($request->safe()->only(['tujuan', 'tanggal_berangkat', 'tanggal_pulang', 'keperluan']));
+            $trip->update($request->safe()->only(['tujuan', 'tanggal_berangkat', 'tanggal_pulang', 'keperluan', 'estimasi_biaya']));
 
             if ($request->has('needs')) {
                 $trip->needs()->delete();
@@ -141,6 +135,6 @@ class TripController extends Controller
 
     private function loaded(Trip $trip): Trip
     {
-        return $trip->load(['user', 'needs', 'documents', 'approvals.approver']);
+        return $trip->load(['user', 'needs', 'documents', 'approvals.approver', 'payments']);
     }
 }

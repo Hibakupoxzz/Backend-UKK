@@ -10,7 +10,7 @@ class Trip extends Model
 {
     protected $fillable = [
         'user_id', 'tujuan', 'tanggal_berangkat',
-        'tanggal_pulang', 'keperluan', 'status',
+        'tanggal_pulang', 'keperluan', 'estimasi_biaya', 'status',
     ];
 
     protected function casts(): array
@@ -19,6 +19,7 @@ class Trip extends Model
             'status'            => TripStatus::class,
             'tanggal_berangkat' => 'date',
             'tanggal_pulang'    => 'date',
+            'estimasi_biaya'    => 'decimal:2',
         ];
     }
 
@@ -27,6 +28,7 @@ class Trip extends Model
     public function documents() { return $this->hasMany(TripDocument::class); }
     public function approvals() { return $this->hasMany(TripApproval::class); }
     public function expenses()  { return $this->hasMany(Expense::class); }
+    public function payments()  { return $this->hasMany(Payment::class); }
 
     // Total biaya dihitung dari data pengeluaran, tidak disimpan manual
     public function getTotalBiayaAttribute()
@@ -45,10 +47,10 @@ class Trip extends Model
             ->when($f['sampai'] ?? null, fn ($q, $v) => $q->whereDate('tanggal_berangkat', '<=', $v));
     }
 
-    // Admin: semua. Atasan: bawahan + miliknya. Pegawai: miliknya.
+    // Admin/HRD/Finance: semua (baca org-wide). Atasan: bawahan + miliknya. Pegawai: miliknya.
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
-        if ($user->hasRole('admin')) {
+        if ($user->hasAnyRole(['admin', 'hrd', 'finance'])) {
             return $query;
         }
 

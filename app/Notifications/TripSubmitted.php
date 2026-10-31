@@ -3,20 +3,31 @@
 namespace App\Notifications;
 
 use App\Models\Trip;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class TripSubmitted extends Notification implements ShouldQueue
+class TripSubmitted extends Notification
 {
-    use Queueable;
-
     public function __construct(public Trip $trip) {}
 
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return $notifiable->notificationChannels();
+    }
+
+    public function toDatabase(object $notifiable): array
+    {
+        $trip = $this->trip;
+
+        return [
+            'type'    => 'trip_submitted',
+            'title'   => 'Pengajuan perjalanan baru',
+            'message' => "{$trip->user->name} mengajukan perjalanan dinas ke {$trip->tujuan}.",
+            'url'     => $notifiable->hasRole('admin')
+                ? '/admin/persetujuan'
+                : "/atasan/persetujuan/{$trip->id}",
+            'trip_id' => $trip->id,
+        ];
     }
 
     public function toMail(object $notifiable): MailMessage

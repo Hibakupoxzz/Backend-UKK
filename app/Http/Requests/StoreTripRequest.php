@@ -18,6 +18,7 @@ class StoreTripRequest extends FormRequest
             'tanggal_berangkat' => ['required', 'date', 'after_or_equal:today'],
             'tanggal_pulang'    => ['required', 'date', 'after_or_equal:tanggal_berangkat'],
             'keperluan'         => ['required', 'string'],
+            'estimasi_biaya'    => ['nullable', 'numeric', 'min:0', 'max:9999999999999'],
             'needs'             => ['sometimes', 'array'],
             'needs.*.jenis'     => ['required', 'string', 'in:transportasi,penginapan'],
             'needs.*.keterangan' => ['nullable', 'string'],

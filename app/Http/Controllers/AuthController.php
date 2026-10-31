@@ -25,6 +25,12 @@ class AuthController extends Controller
             ]);
         }
 
+        if (! $user->is_active) {
+            throw ValidationException::withMessages([
+                'email' => ['Akun ini dinonaktifkan. Hubungi administrator.'],
+            ]);
+        }
+
         $token = $user->createToken('nuxt')->plainTextToken;
 
         return response()->json([
@@ -52,6 +58,12 @@ class AuthController extends Controller
             'name'       => $user->name,
             'email'      => $user->email,
             'department' => $user->department,
+            'no_hp'      => $user->no_hp,
+            'jabatan'    => $user->jabatan,
+            'foto_url'   => $user->foto_path
+                ? \Illuminate\Support\Facades\Storage::disk('public')->url($user->foto_path)
+                : null,
+            'is_active'  => (bool) $user->is_active,
             'role'       => $user->getRoleNames()->first(),
             'roles'      => $user->getRoleNames(),
         ];

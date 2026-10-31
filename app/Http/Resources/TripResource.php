@@ -10,6 +10,9 @@ class TripResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $realisasi = (float) ($this->expenses_sum_jumlah ?? $this->expenses()->sum('jumlah'));
+        $estimasi = $this->estimasi_biaya === null ? null : (float) $this->estimasi_biaya;
+
         return [
             'id'                => $this->id,
             'tujuan'            => $this->tujuan,
@@ -18,7 +21,9 @@ class TripResource extends JsonResource
             'keperluan'         => $this->keperluan,
             'status'            => $this->status->value,
             'status_label'      => $this->status->label(),
-            'total_biaya'       => (float) ($this->expenses_sum_jumlah ?? $this->expenses()->sum('jumlah')),
+            'estimasi_biaya'    => $estimasi,
+            'total_biaya'       => $realisasi,
+            'selisih_biaya'     => $estimasi === null ? null : $realisasi - $estimasi,
             'created_at'        => $this->created_at,
 
             'user'      => $this->whenLoaded('user', fn () => [
@@ -33,6 +38,14 @@ class TripResource extends JsonResource
             'approvals' => $this->whenLoaded('approvals', fn () => $this->approvals->map(fn ($a) => [
                 'id' => $a->id, 'status' => $a->status, 'catatan' => $a->catatan,
                 'approver' => $a->approver?->name, 'at' => $a->created_at,
+            ])),
+            'payments' => $this->whenLoaded('payments', fn () => $this->payments->map(fn ($p) => [
+                'id'               => $p->id,
+                'status'           => $p->status->value,
+                'status_label'     => $p->status->label(),
+                'jumlah_diajukan'  => (float) $p->jumlah_diajukan,
+                'jumlah_disetujui' => $p->jumlah_disetujui === null ? null : (float) $p->jumlah_disetujui,
+                'created_at'       => $p->created_at,
             ])),
         ];
     }

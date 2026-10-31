@@ -18,11 +18,11 @@ class TripPolicy
         return $trip->user->atasan_id === $user->id;
     }
 
-    // Lihat: pemilik, atasan langsung, atau admin
+    // Lihat: pemilik, atasan langsung, admin, atau peran pembaca org-wide (HRD/Finance)
     public function view(User $user, Trip $trip): bool
     {
         return $this->isOwner($user, $trip)
-            || $user->hasRole('admin')
+            || $user->hasAnyRole(['admin', 'hrd', 'finance'])
             || $this->isAtasanOf($user, $trip);
     }
 
